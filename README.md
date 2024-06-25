@@ -1,5 +1,6 @@
 # Stocks 52-Week Low Ranker
 
+![build](https://github.com/thobiast/stocks-52week-rank/actions/workflows/build.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
