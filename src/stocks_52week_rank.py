@@ -15,9 +15,13 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
 
 @dataclass(frozen=True)
@@ -266,6 +270,10 @@ def save_dataframe_as_html(df, base_filename):
 
 def save_dataframe_as_image(df, base_filename):
     """Save the DataFrame as an image file."""
+
+    if plt is None:
+        print("matplotlib is required for image output. Please install it.")
+        sys.exit(1)
 
     filename = f"{base_filename}.png"
     create_image(df, filename)
