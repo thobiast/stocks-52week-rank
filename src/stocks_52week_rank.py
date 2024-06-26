@@ -15,12 +15,16 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
 
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
-@dataclass
+
+@dataclass(frozen=True)
 class StockInfo:
     """Data class to hold stock information."""
 
@@ -38,7 +42,7 @@ class StockDataProcessor:
 
     Attributes:
     tickers (list of str): List of stock tickers to process.
-    stock_data (list of StockInfo): List of processed stock data.
+    stock_data (dict): Dictionary of processed stock data with ticker as key.
     """
 
     def __init__(self, tickers):
@@ -49,7 +53,7 @@ class StockDataProcessor:
         tickers (list of str): List of stock tickers.
         """
         self.tickers = tickers
-        self.stock_data = []
+        self.stock_data = {}
 
     def fetch_stock_data(self):
         """Fetch stock information for tickers and store in self.stock_data."""
@@ -81,15 +85,20 @@ class StockDataProcessor:
                 current_pct_from_low=current_pct_from_low,
                 moving_average_200d=moving_average_200d,
             )
-            self.stock_data.append(stock_info)
+            self.stock_data[clean_ticker] = stock_info
 
         logging.info(f"Successfully processed data for {len(self.stock_data)} stocks.")
 
     def sort_stock_data(self):
-        """Sort stock data by the current percentage from the 52-week low in ascending order."""
+        """
+        Sort stock data by the current percentage from the 52-week low in ascending order.
+
+        Returns:
+        list of StockInfo: A list
+        """
         logging.info("Sorting stock data.")
 
-        return sorted(self.stock_data, key=lambda x: x.current_pct_from_low)
+        return sorted(self.stock_data.values(), key=lambda x: x.current_pct_from_low)
 
     def create_dataframe(self, top):
         """
@@ -261,6 +270,10 @@ def save_dataframe_as_html(df, base_filename):
 
 def save_dataframe_as_image(df, base_filename):
     """Save the DataFrame as an image file."""
+
+    if plt is None:
+        print("matplotlib is required for image output. Please install it.")
+        sys.exit(1)
 
     filename = f"{base_filename}.png"
     create_image(df, filename)
