@@ -24,6 +24,9 @@ except ImportError:
     plt = None
 
 
+MOVING_AVERAGE_WINDOW = 200
+IMAGE_COLUMN_WIDTHS = [0.1, 0.2, 0.2, 0.2, 0.2, 0.2]
+
 @dataclass(frozen=True)
 class StockInfo:
     """Data class to hold stock information."""
@@ -71,11 +74,9 @@ class StockDataProcessor:
             high_52_week = ticker_data.max()
             low_52_week = ticker_data.min()
             current_pct_from_low = ((current_price - low_52_week) / low_52_week) * 100
-            moving_average_200d = ticker_data.rolling(window=200).mean().iloc[-1]
+            moving_average_200d = ticker_data.rolling(window=MOVING_AVERAGE_WINDOW).mean().iloc[-1]
 
-            clean_ticker = (
-                ticker.replace(".SA", "") if ticker.endswith(".SA") else ticker
-            )
+            clean_ticker = ticker.removesuffix(".SA")
 
             stock_info = StockInfo(
                 ticker=clean_ticker,
@@ -245,8 +246,7 @@ def create_image(df, filename):
             cell.set_facecolor("#f0f0f0")  # Light gray background
 
     # Adjust column widths
-    col_widths = [0.1, 0.2, 0.2, 0.2, 0.2, 0.2]
-    for i, _width in enumerate(col_widths):
+    for i, _width in enumerate(IMAGE_COLUMN_WIDTHS):
         mpl_table.auto_set_column_width([i])
 
     # Save the table as an image
