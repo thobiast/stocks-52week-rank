@@ -55,11 +55,61 @@ class DataProvider(ABC):
         Returns:
             dict: A dictionary of StockInfo objects with the ticker as the key.
         """
-        pass
 
 
 class YFinanceDataProvider(DataProvider):
     """Data provider for Yahoo Finance."""
+
+    def _download_data(self, tickers):
+        """
+        Download historical stock data from Yahoo Finance.
+
+        Parameters:
+            tickers (list[str]): List of stock tickers to download.
+
+        Returns:
+            pandas.DataFrame: A DataFrame containing the historical data, or None if download fails.
+        """
+        logging.info(
+            "Downloading stock data for %s tickers from Yahoo Finance.", len(tickers)
+        )
+        try:
+            data = yf.download(tickers, period="1y")
+            return data
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            print(f"Error downloading data from yfinance: {e}")
+            sys.exit(1)
+
+    def _process_ticker_data(self, ticker, all_data):
+        """
+        Process the downloaded data for a single ticker to compute metrics.
+
+        Parameters:
+            ticker (str): The stock ticker to process.
+            all_data (pandas.DataFrame): The DataFrame containing data for all tickers.
+
+        Returns:
+            StockInfo: A StockInfo object with the computed metrics.
+        """
+        ticker_data = all_data["Close"][ticker]
+        current_price = ticker_data.iloc[-1]
+        high_52_week = ticker_data.max()
+        low_52_week = ticker_data.min()
+        current_pct_from_low = ((current_price - low_52_week) / low_52_week) * 100
+        moving_average_200d = (
+            ticker_data.rolling(window=MOVING_AVERAGE_WINDOW).mean().iloc[-1]
+        )
+
+        clean_ticker = ticker.removesuffix(".SA")
+
+        return StockInfo(
+            ticker=clean_ticker,
+            current_price=current_price,
+            high_52_week=high_52_week,
+            low_52_week=low_52_week,
+            current_pct_from_low=current_pct_from_low,
+            moving_average_200d=moving_average_200d,
+        )
 
     def fetch_stock_data(self, tickers):
         """
@@ -71,38 +121,14 @@ class YFinanceDataProvider(DataProvider):
         Returns:
             dict: A dictionary of StockInfo objects with the ticker as the key.
         """
-        logging.info("Downloading stock data from Yahoo Finance.")
+        all_data = self._download_data(tickers)
+
         stock_data = {}
-
-        try:
-            data = yf.download(tickers, period="1y")
-        except Exception as e:
-            print(f"Error downloading data: {e}")
-            sys.exit(1)
-
         for ticker in tickers:
-            ticker_data = data["Close"][ticker]
-            current_price = ticker_data.iloc[-1]
-            high_52_week = ticker_data.max()
-            low_52_week = ticker_data.min()
-            current_pct_from_low = ((current_price - low_52_week) / low_52_week) * 100
-            moving_average_200d = (
-                ticker_data.rolling(window=MOVING_AVERAGE_WINDOW).mean().iloc[-1]
-            )
+            stock_info = self._process_ticker_data(ticker, all_data)
+            stock_data[stock_info.ticker] = stock_info
 
-            clean_ticker = ticker.removesuffix(".SA")
-
-            stock_info = StockInfo(
-                ticker=clean_ticker,
-                current_price=current_price,
-                high_52_week=high_52_week,
-                low_52_week=low_52_week,
-                current_pct_from_low=current_pct_from_low,
-                moving_average_200d=moving_average_200d,
-            )
-            stock_data[clean_ticker] = stock_info
-
-        logging.info(f"Successfully processed data for {len(stock_data)} stocks.")
+        logging.info("Successfully processed data for %s stocks.", len(stock_data))
         return stock_data
 
 
@@ -226,7 +252,12 @@ def parse_parameters():
 
 
 def configure_logging(debug_flag):
-    """Configure logging based on the command line argument."""
+    """
+    Configure logging based on the command line argument.
+
+    Parameters:
+        debug_flag (bool): If True, sets logging level to INFO; otherwise, CRITICAL.
+    """
 
     if debug_flag:
         logging.basicConfig(
@@ -239,22 +270,36 @@ def configure_logging(debug_flag):
 
 
 def read_tickers(file_path):
-    """Read the list of tickers from a file, ignoring blank lines."""
-    logging.info(f"Reading tickers from file {file_path}.")
+    """
+    Read the list of tickers from a file, ignoring blank lines.
+
+    Parameters:
+        file_path (str): The path to the file containing tickers.
+
+    Returns:
+        list of str: A list of stock tickers.
+    """
+    logging.info("Reading tickers from file %s", file_path)
 
     if not os.path.exists(file_path):
         print(f"Error: File {file_path} not found.")
         sys.exit(1)
 
-    with open(file_path, "r") as file:
+    with open(file_path, "r", encoding="utf-8") as file:
         tickers = [line.strip() for line in file.readlines() if line.strip()]
 
-    logging.info(f"Read {len(tickers)} tickers from file {file_path}.")
+    logging.info("Read %s tickers from file %s", len(tickers), file_path)
     return tickers
 
 
 def create_image(df, filename):
-    """Create and save the stock data table as an image."""
+    """
+    Create and save the stock data table as an image.
+
+    Parameters:
+        df (pandas.DataFrame): The DataFrame to be converted to an image.
+        filename (str): The name of the output image file.
+    """
     logging.info("Creating image from the dataframe.")
 
     # Set up the plot
@@ -314,7 +359,7 @@ def save_dataframe_as_html(df, base_filename):
 
     filename = f"{base_filename}.html"
     df.to_html(filename, index=False)
-    logging.info(f"HTML file saved as {filename}")
+    logging.info("HTML file saved as %s", filename)
 
 
 def save_dataframe_as_image(df, base_filename):
@@ -326,10 +371,10 @@ def save_dataframe_as_image(df, base_filename):
 
     filename = f"{base_filename}.png"
     create_image(df, filename)
-    logging.info(f"Image file saved as {filename}")
+    logging.info("Image file saved as %s", filename)
 
 
-def run(output, top, tickers_file, debug_flag):
+def run(output, top, tickers_file, debug_flag, source):
     """
     Process stock data and generate output.
 
@@ -338,10 +383,11 @@ def run(output, top, tickers_file, debug_flag):
     and generates the output in the specified format.
 
     Parameters:
-    output (str): The output format ('text', 'image', 'html').
-    top (int): The number of top stocks to display or save.
-    tickers_file (str): Path to the file containing the list of tickers.
-    debug_flag (bool): Flag to enable or disable debugging output.
+        output (str): The output format ('text', 'image', 'html').
+        top (int): The number of top stocks to display or save.
+        tickers_file (str): Path to the file containing the list of tickers.
+        debug_flag (bool): Flag to enable or disable debugging output.
+        source (str): The data source to use ('yfinance' or 'finnhub').
     """
 
     configure_logging(debug_flag)
@@ -351,7 +397,10 @@ def run(output, top, tickers_file, debug_flag):
         print("Error: No tickers read from the file.")
         sys.exit(1)
 
-    data_provider = YFinanceDataProvider()
+    if source == "yfinance":
+        data_provider = YFinanceDataProvider()
+    else:
+        data_provider = None
 
     stocks = StockDataProcessor(tickers, data_provider)
     stocks.fetch_stock_data()
@@ -372,11 +421,11 @@ def main():
     """
     Main entry point for the stocks-52week-rank script.
 
-    This function parses command-line arguments and calls the run function with the parsed arguments.
+    This function parses command-line arguments and calls the run function.
     """
 
     args = parse_parameters()
-    run(args.output, args.top, args.file, args.debug)
+    run(args.output, args.top, args.file, args.debug, args.source)
 
 
 ##############################################################################

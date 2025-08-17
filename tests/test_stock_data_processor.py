@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+"""Tests for StockDataProcessor and YFinanceDataProvider."""
+
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -29,6 +31,7 @@ mock_pd_prices_data = {
 
 # Compute expected values
 def compute_expected_values(prices):
+    """Return expected metric for price series used in the test."""
     current_price = prices[-1]
     high_52_week = max(prices)
     low_52_week = min(prices)
@@ -43,8 +46,8 @@ def compute_expected_values(prices):
     }
 
 
-@pytest.fixture
-def stock_processor():
+@pytest.fixture(name="stock_processor")
+def _stock_processor():
     """
     Fixture to create a StockDataProcessor instance.
 
@@ -57,8 +60,8 @@ def stock_processor():
     return StockDataProcessor(list(mock_stocks_prices.keys()), provider)
 
 
-@pytest.fixture
-def populated_stock_processor(stock_processor):
+@pytest.fixture(name="populated_stock_processor")
+def _populated_stock_processor(stock_processor):
     """
     Fixture to create a StockDataProcessor instance with populated stock data.
 

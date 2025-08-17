@@ -43,3 +43,8 @@ stocks-52week-rank = "stocks_52week_rank:main"
 
 [tool.isort]
 profile = "black"
+
+[tool.pylint]
+disable = [
+    "too-few-public-methods",
+]
