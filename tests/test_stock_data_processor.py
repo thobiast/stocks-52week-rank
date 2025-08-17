@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from src.stocks_52week_rank import (
+from stocks_52week_rank.main import (
     DataProvider,
     StockDataProcessor,
     StockInfo,

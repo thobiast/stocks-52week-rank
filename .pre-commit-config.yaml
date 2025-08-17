@@ -41,3 +41,4 @@ repos:
             - "pandas"
             - "matplotlib"
             - "pytest"
+            - "polygon-api-client"
