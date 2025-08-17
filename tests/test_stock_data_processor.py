@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
-from src.stocks_52week_rank import StockDataProcessor, StockInfo
+from src.stocks_52week_rank import (
+    DataProvider,
+    StockDataProcessor,
+    StockInfo,
+    YFinanceDataProvider,
+)
 
 # Generate mock data for testing
 dates = pd.date_range("2023-01-01", periods=250)
@@ -48,7 +53,8 @@ def stock_processor():
     Returns:
     StockDataProcessor: An instance of StockDataProcessor initialized with mock tickers.
     """
-    return StockDataProcessor(list(mock_stocks_prices.keys()))
+    provider = YFinanceDataProvider()
+    return StockDataProcessor(list(mock_stocks_prices.keys()), provider)
 
 
 @pytest.fixture
@@ -67,6 +73,9 @@ def populated_stock_processor(stock_processor):
     Returns:
     StockDataProcessor: An instance of StockDataProcessor with populated stock data.
     """
+    mock_provider = MagicMock(spec=DataProvider)
+    stock_processor = StockDataProcessor(list(mock_stocks_prices.keys()), mock_provider)
+
     stock_processor.stock_data = {}
     for ticker, prices in mock_stocks_prices.items():
         expected_values = compute_expected_values(prices)

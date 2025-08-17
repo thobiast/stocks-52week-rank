@@ -12,6 +12,7 @@ import argparse
 import logging
 import os
 import sys
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -27,6 +28,7 @@ except ImportError:
 MOVING_AVERAGE_WINDOW = 200
 IMAGE_COLUMN_WIDTHS = [0.1, 0.2, 0.2, 0.2, 0.2, 0.2]
 
+
 @dataclass(frozen=True)
 class StockInfo:
     """Data class to hold stock information."""
@@ -39,42 +41,54 @@ class StockInfo:
     moving_average_200d: float
 
 
-class StockDataProcessor:
-    """
-    A class to process and fetch stock data.
+class DataProvider(ABC):
+    """Abstract base class for data providers."""
 
-    Attributes:
-    tickers (list of str): List of stock tickers to process.
-    stock_data (dict): Dictionary of processed stock data with ticker as key.
-    """
-
-    def __init__(self, tickers):
+    @abstractmethod
+    def fetch_stock_data(self, tickers):
         """
-        Initialize StockDataProcessor object.
+        Abstract method to fetch and compute stock information for a list of tickers.
 
         Parameters:
-        tickers (list of str): List of stock tickers.
-        """
-        self.tickers = tickers
-        self.stock_data = {}
+            tickers  list[str]: List of stock tickers to process.
 
-    def fetch_stock_data(self):
-        """Fetch stock information for tickers and store in self.stock_data."""
-        logging.info("Downloading stock data.")
+        Returns:
+            dict: A dictionary of StockInfo objects with the ticker as the key.
+        """
+        pass
+
+
+class YFinanceDataProvider(DataProvider):
+    """Data provider for Yahoo Finance."""
+
+    def fetch_stock_data(self, tickers):
+        """
+        Fetch stock information from Yahoo Finance.
+
+        Parameters:
+            tickers (list[str]): List of stock tickers to process.
+
+        Returns:
+            dict: A dictionary of StockInfo objects with the ticker as the key.
+        """
+        logging.info("Downloading stock data from Yahoo Finance.")
+        stock_data = {}
 
         try:
-            data = yf.download(self.tickers, period="1y")
+            data = yf.download(tickers, period="1y")
         except Exception as e:
             print(f"Error downloading data: {e}")
             sys.exit(1)
 
-        for ticker in self.tickers:
+        for ticker in tickers:
             ticker_data = data["Close"][ticker]
             current_price = ticker_data.iloc[-1]
             high_52_week = ticker_data.max()
             low_52_week = ticker_data.min()
             current_pct_from_low = ((current_price - low_52_week) / low_52_week) * 100
-            moving_average_200d = ticker_data.rolling(window=MOVING_AVERAGE_WINDOW).mean().iloc[-1]
+            moving_average_200d = (
+                ticker_data.rolling(window=MOVING_AVERAGE_WINDOW).mean().iloc[-1]
+            )
 
             clean_ticker = ticker.removesuffix(".SA")
 
@@ -86,16 +100,45 @@ class StockDataProcessor:
                 current_pct_from_low=current_pct_from_low,
                 moving_average_200d=moving_average_200d,
             )
-            self.stock_data[clean_ticker] = stock_info
+            stock_data[clean_ticker] = stock_info
 
-        logging.info(f"Successfully processed data for {len(self.stock_data)} stocks.")
+        logging.info(f"Successfully processed data for {len(stock_data)} stocks.")
+        return stock_data
+
+
+class StockDataProcessor:
+    """
+    A class to process stock data fetched from a data provider.
+
+    Attributes:
+        tickers (list): List of stock tickers to process.
+        data_provider (DataProvider): The data provider used to fetch stock data.
+        stock_data (dict): Dictionary of processed stock data with ticker as key.
+    """
+
+    def __init__(self, tickers, data_provider):
+        """
+        Initialize StockDataProcessor object.
+
+        Parameters:
+            tickers (list): List of stock tickers.
+            data_provider (DataProvider): The data provider to use for fetching data.
+        """
+        self.tickers = tickers
+        self.data_provider = data_provider
+        self.stock_data = {}
+
+    def fetch_stock_data(self):
+        """Fetch stock information using the provided data provider."""
+        logging.info("Downloading stock data.")
+        self.stock_data = self.data_provider.fetch_stock_data(self.tickers)
 
     def sort_stock_data(self):
         """
         Sort stock data by the current percentage from the 52-week low in ascending order.
 
         Returns:
-        list of StockInfo: A list
+            list of StockInfo: A list of StockInfo objects sorted
         """
         logging.info("Sorting stock data.")
 
@@ -106,10 +149,10 @@ class StockDataProcessor:
         Create and format a pandas DataFrame from stock data.
 
         Parameters:
-        top (int): Number of top stocks to include in the DataFrame.
+            top (int): Number of top stocks to include in the DataFrame.
 
         Returns:
-        pandas.DataFrame: Formatted DataFrame containing the top stock data.
+            pandas.DataFrame: Formatted DataFrame containing the top stock data.
         """
         logging.info("Creating dataframe from stock data.")
 
@@ -154,6 +197,12 @@ def parse_parameters():
     )
     parser.add_argument(
         "-d", "--debug", action="store_true", dest="debug", help="debug flag"
+    )
+    parser.add_argument(
+        "--source",
+        choices=["yfinance"],
+        default="yfinance",
+        help="Choose the data source for stock data. Choices: %(choices)s. (default: %(default)s)",
     )
     parser.add_argument(
         "--output",
@@ -302,7 +351,9 @@ def run(output, top, tickers_file, debug_flag):
         print("Error: No tickers read from the file.")
         sys.exit(1)
 
-    stocks = StockDataProcessor(tickers)
+    data_provider = YFinanceDataProvider()
+
+    stocks = StockDataProcessor(tickers, data_provider)
     stocks.fetch_stock_data()
     df = stocks.create_dataframe(top)
 
