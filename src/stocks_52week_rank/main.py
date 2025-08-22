@@ -29,8 +29,8 @@ def parse_parameters():
     epilog = """
     Usage examples:
         %(prog)s
-        %(prog)s --output image
-        %(prog)s --top 10
+        %(prog)s --file ./my_stocks.txt
+        %(prog)s --file ./my_stocks.txt --top 10
         %(prog)s --top 10 --file ./my_stocks.txt --output image
     """
     parser = argparse.ArgumentParser(
@@ -54,10 +54,14 @@ def parse_parameters():
         help="""Choose the output format::
             'text' displays on screen,
             'image' saves as a file (.png),
-            'html'  saves as a file (.html)""",
+            'html'  saves as a file (.html)
+            (default: %(default)s)""",
     )
     parser.add_argument(
-        "--top", type=int, default=25, help="Number of stocks to display"
+        "--top",
+        type=int,
+        default=25,
+        help="Number of stocks to display. (default: %(default)s)",
     )
     parser.add_argument(
         "--file",
